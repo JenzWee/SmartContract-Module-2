@@ -1,12 +1,175 @@
 # SmartContract-Module-2
 
-After cloning the github, you will want to do the following to get the code running on your computer.
+## Description
+A demo of Smart Contract Management with Metamask. Explaining the bank loan process just like in a Loyalty card
+with two functionalities LoadPoints 1 ETH and RedeemPoints 1 ETH
 
-1. Inside the project directory, in the terminal type: npm i
-2. Open two additional terminals in your VS code
-3. In the second terminal type: npx hardhat node
-4. In the third terminal, type: npx hardhat run --network localhost scripts/deploy.js
-5. Back in the first terminal, type npm run dev to launch the front-end.
+## Functionalities 
 
-After this, the project will be running on your localhost. 
-Typically at http://localhost:3000/
+I Cloned Sir Chris Repository and did the following
+
+1. Inside the project directory, in the terminal I typed: npm i
+2. In the second terminal I typed: npx hardhat node
+3. In the third terminal, I typed: npx hardhat run --network localhost scripts/deploy.js
+4. Back in the first terminal, type npm run dev to launch the front-end.
+   
+   After this, the project will be running on your localhost. 
+  Typically at http://localhost:3000/
+
+In the index.js, I made an addition functionality which is the transaction history. This Function maintains a 
+record of all transaction including their `type`, `amounts` and `timestamp` the history can be use full for user 
+to tract their activities
+
+## Full Code in index.js 
+```jsx
+import {useState, useEffect} from "react";
+import {ethers} from "ethers";
+import atm_abi from "../artifacts/contracts/Assessment.sol/Assessment.json";
+
+export default function HomePage() {
+  const [ethWallet, setEthWallet] = useState(undefined);
+  const [account, setAccount] = useState(undefined);
+  const [atm, setATM] = useState(undefined);
+  const [balance, setBalance] = useState(undefined);
+  const [transactions, setTransactions] = useState([]);
+
+  const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+  const atmABI = atm_abi.abi;
+
+  const getWallet = async() => {
+    if (window.ethereum) {
+      setEthWallet(window.ethereum);
+    }
+
+    if (ethWallet) {
+      const account = await ethWallet.request({method: "eth_accounts"});
+      handleAccount(account);
+    }
+  }
+
+  const handleAccount = (account) => {
+    if (account) {
+      console.log ("Account connected: ", account);
+      setAccount(account);
+    }
+    else {
+      console.log("No account found");
+    }
+  }
+
+  const connectAccount = async() => {
+    if (!ethWallet) {
+      alert('MetaMask wallet is required to connect');
+      return;
+    }
+  
+    const accounts = await ethWallet.request({ method: 'eth_requestAccounts' });
+    handleAccount(accounts);
+    
+    // once wallet is set we can get a reference to our deployed contract
+    getATMContract();
+  };
+
+  const getATMContract = () => {
+    const provider = new ethers.providers.Web3Provider(ethWallet);
+    const signer = provider.getSigner();
+    const atmContract = new ethers.Contract(contractAddress, atmABI, signer);
+ 
+    setATM(atmContract);
+  }
+
+  const getBalance = async() => {
+    if (atm) {
+      setBalance((await atm.getBalance()).toNumber());
+    }
+  }
+
+  const deposit = async() => {
+    if (atm) {
+      let tx = await atm.deposit(1);
+      await tx.wait();
+      getBalance();
+      updateTransactionHistory("Top-Up Points", 1);
+    }
+  }
+
+  const withdraw = async() => {
+    if (atm) {
+      let tx = await atm.withdraw(1);
+      await tx.wait();
+      getBalance();
+      updateTransactionHistory("RedeemPoints", -1);
+    }
+  }
+
+  const updateTransactionHistory = (type, amount) => {
+    const newTransaction = {
+      type: type,
+      amount: amount,
+      timestamp: new Date().toLocaleString()
+    };
+    setTransactions([...transactions, newTransaction]);
+  }
+
+  const renderTransactions = () => {
+    return transactions.map((transaction, index) => (
+      <li key={index}>
+        {transaction.type}: {transaction.amount} ETH ({transaction.timestamp})
+      </li>
+    ));
+  }
+
+  const initUser = () => {
+    // Check to see if user has Metamask
+    if (!ethWallet) {
+      return <p>Please install Metamask in order to use this ATM.</p>
+    }
+
+    // Check to see if user is connected. If not, connect to their account
+    if (!account) {
+      return <button onClick={connectAccount}>Please connect your Metamask wallet</button>
+    }
+
+    if (balance == undefined) {
+      getBalance();
+    }
+
+    return (
+      <div>
+        <p>Your Account: {account}</p>
+        <p>Your Balance: {balance}</p>
+        <button onClick={deposit}>Top-Up Points 1 ETH</button>
+        <button onClick={withdraw}>RedeemPoints 1 ETH</button>
+        <h2>Transaction History</h2>
+        <ul>{renderTransactions()}</ul>
+      </div>
+    )
+  }
+
+  useEffect(() => {getWallet();}, []);
+
+  return (
+    <main className="container">
+      <header><h1>Welcome to the WeBanks!</h1></header>
+      {initUser()}
+      <style jsx>{`	
+        .container {
+          background-color: #EDC3C6;
+          text-align: center;
+          margin: 50px auto;
+          padding: 20px;
+          max-width: 600px;
+          border: 1px solid #ccc;
+          border-radius: 10px;
+          box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+          font-family: Arial, sans-serif;
+        }
+      `}
+      </style>
+    </main>
+  )
+}
+```
+
+# Authors 
+Wee, Jencen M. 8212778@ntc.edu.ph
