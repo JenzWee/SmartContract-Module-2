@@ -17,7 +17,7 @@ I Cloned Sir Chris Repository and did the following
   Typically at http://localhost:3000/
 
 In the index.js, I made an addition functionality which is the transaction history. This Function maintains a 
-record of all transaction including their `type`, `amounts` and `timestamp` the history can be use full for user 
+record of all transaction including their `type` , `amounts` and `timestamp` the history can be use full for user 
 to tract their activities
 
 ## Full Code in index.js 
