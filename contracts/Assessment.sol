@@ -1,42 +1,60 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-contract LoyaltySystem {
-    address public owner;
-    mapping(address => uint256) public balances;
-    mapping(address => Transaction[]) public transactionHistory;
+//import "hardhat/console.sol";
 
-    event PointsDeposited(address indexed account, uint256 amount);
-    event PointsWithdrawn(address indexed account, uint256 amount);
+contract WeLoyalty {
+    address payable public owner;
+    uint256 public balance;
 
-    struct Transaction {
-        uint256 amount;
-        uint256 timestamp;
+    event TopUpPoints(uint256 amount);
+    event RedeemPoints(uint256 amount);
+
+    constructor(uint initBalance) payable {
+        owner = payable(msg.sender);
+        balance = initBalance;
     }
 
-    constructor() {
-        owner = msg.sender;
+    function getBalance() public view returns(uint256){
+        return balance;
     }
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can call this function");
-        _;
+    function topUpPoints(uint256 _amount) public payable {
+        uint _previousBalance = balance;
+
+        // Ensure only the owner can top up points
+        require(msg.sender == owner, "You are not authorized to top up points.");
+
+        // Perform the transaction
+        balance += _amount;
+
+        // Assert transaction completed successfully
+        assert(balance == _previousBalance + _amount);
+
+        // Emit the event
+        emit TopUpPoints(_amount);
     }
 
-    function depositPoints(uint256 amount) external {
-        balances[msg.sender] += amount;
-        emit PointsDeposited(msg.sender, amount);
-        transactionHistory[msg.sender].push(Transaction(amount, block.timestamp));
-    }
+    // Custom error
+    error InsufficientBalance(uint256 balance, uint256 redeemAmount);
 
-    function withdrawPoints(uint256 amount) external {
-        require(balances[msg.sender] >= amount, "Insufficient balance");
-        balances[msg.sender] -= amount;
-        emit PointsWithdrawn(msg.sender, amount);
-        transactionHistory[msg.sender].push(Transaction(amount * -1, block.timestamp));
-    }
+    function redeemPoints(uint256 _redeemAmount) public {
+        require(msg.sender == owner, "You are not authorized to redeem points.");
+        uint _previousBalance = balance;
+        if (balance < _redeemAmount) {
+            revert InsufficientBalance({
+                balance: balance,
+                redeemAmount: _redeemAmount
+            });
+        }
 
-    function getTransactionHistory(address account) external view returns (Transaction[] memory) {
-        return transactionHistory[account];
+        // Redeem the given amount
+        balance -= _redeemAmount;
+
+        // Assert the balance is correct
+        assert(balance == (_previousBalance - _redeemAmount));
+
+        // Emit the event
+        emit RedeemPoints(_redeemAmount);
     }
 }
