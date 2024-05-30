@@ -1,6 +1,7 @@
-import {useState, useEffect} from "react";
-import {ethers} from "ethers";
+import { useState, useEffect } from "react";
+import { ethers } from "ethers";
 import atm_abi from "../artifacts/contracts/Assessment.sol/Assessment.json";
+import jsPDF from "jspdf";
 
 export default function HomePage() {
   const [ethWallet, setEthWallet] = useState(undefined);
@@ -12,80 +13,80 @@ export default function HomePage() {
   const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
   const atmABI = atm_abi.abi;
 
-  const getWallet = async() => {
+  const getWallet = async () => {
     if (window.ethereum) {
       setEthWallet(window.ethereum);
     }
 
     if (ethWallet) {
-      const account = await ethWallet.request({method: "eth_accounts"});
-      handleAccount(account);
+      const accounts = await ethWallet.request({ method: "eth_accounts" });
+      handleAccount(accounts);
     }
-  }
+  };
 
-  const handleAccount = (account) => {
-    if (account) {
-      console.log ("Account connected: ", account);
-      setAccount(account);
-    }
-    else {
+  const handleAccount = (accounts) => {
+    if (accounts && accounts.length > 0) {
+      console.log("Account connected:", accounts[0]);
+      setAccount(accounts[0]);
+    } else {
       console.log("No account found");
     }
-  }
+  };
 
-  const connectAccount = async() => {
+  const connectAccount = async () => {
     if (!ethWallet) {
-      alert('MetaMask wallet is required to connect');
+      alert("MetaMask wallet is required to connect");
       return;
     }
-  
-    const accounts = await ethWallet.request({ method: 'eth_requestAccounts' });
-    handleAccount(accounts);
-    
-    // once wallet is set we can get a reference to our deployed contract
-    getATMContract();
+
+    try {
+      const accounts = await ethWallet.request({ method: "eth_requestAccounts" });
+      handleAccount(accounts);
+      getATMContract();
+    } catch (error) {
+      console.error("Error connecting account:", error);
+    }
   };
 
   const getATMContract = () => {
     const provider = new ethers.providers.Web3Provider(ethWallet);
     const signer = provider.getSigner();
     const atmContract = new ethers.Contract(contractAddress, atmABI, signer);
- 
+
     setATM(atmContract);
-  }
+  };
 
-  const getBalance = async() => {
+  const getBalance = async () => {
     if (atm) {
-      setBalance((await atm.getBalance()).toNumber());
+      const balance = await atm.getBalance();
+      setBalance(balance.toNumber());
     }
-  }
+  };
 
-  const deposit = async() => {
+  const performTransaction = async (transactionType, transactionFunction) => {
     if (atm) {
-      let tx = await atm.deposit(1);
-      await tx.wait();
-      getBalance();
-      updateTransactionHistory("Top-Up Points", 1);
+      try {
+        const tx = await transactionFunction();
+        await tx.wait();
+        getBalance();
+        updateTransactionHistory(transactionType, 2); // Change amount to 2
+      } catch (error) {
+        console.error(`Error ${transactionType} transaction:`, error);
+      }
     }
-  }
+  };
 
-  const withdraw = async() => {
-    if (atm) {
-      let tx = await atm.withdraw(1);
-      await tx.wait();
-      getBalance();
-      updateTransactionHistory("RedeemPoints", -1);
-    }
-  }
+  const deposit = () => performTransaction("Top-Up Points", () => atm.deposit(2)); // Change amount to 2
+  const withdraw = () => performTransaction("RedeemPoints", () => atm.withdraw(2)); // Change amount to 2
 
   const updateTransactionHistory = (type, amount) => {
     const newTransaction = {
       type: type,
       amount: amount,
-      timestamp: new Date().toLocaleString()
+      timestamp: new Date().toLocaleString(),
     };
-    setTransactions([...transactions, newTransaction]);
-  }
+    setTransactions(prevTransactions => [...prevTransactions, newTransaction]);
+  };
 
   const renderTransactions = () => {
     return transactions.map((transaction, index) => (
@@ -93,20 +94,33 @@ export default function HomePage() {
         {transaction.type}: {transaction.amount} ETH ({transaction.timestamp})
       </li>
     ));
-  }
+  };
+
+  const saveTransactionHistoryAsPDF = () => {
+    const doc = new jsPDF();
+    doc.text("Transaction History", 10, 10);
+    let yPos = 20;
+    transactions.forEach((transaction, index) => {
+      doc.text(`${transaction.type}: ${transaction.amount} ETH (${transaction.timestamp})`, 10, yPos);
+      yPos += 10;
+    });
+    doc.save("transaction_history.pdf");
+  };
+
+  const deleteTransactions = () => {
+    setTransactions([]);
+  };
 
   const initUser = () => {
-    // Check to see if user has Metamask
     if (!ethWallet) {
-      return <p>Please install Metamask in order to use this ATM.</p>
+      return <p>Please install Metamask in order to use this ATM.</p>;
     }
 
-    // Check to see if user is connected. If not, connect to their account
     if (!account) {
-      return <button onClick={connectAccount}>Please connect your Metamask wallet</button>
+      return <button onClick={connectAccount}>Please connect your Metamask wallet</button>;
     }
 
-    if (balance == undefined) {
+    if (balance === undefined) {
       getBalance();
     }
 
@@ -114,23 +128,29 @@ export default function HomePage() {
       <div>
         <p>Your Account: {account}</p>
         <p>Your Balance: {balance}</p>
-        <button onClick={deposit}>Top-Up Points 1 ETH</button>
-        <button onClick={withdraw}>RedeemPoints 1 ETH</button>
+        <button onClick={deposit}>Top-Up Points 2 ETH</button> {/* Change button text */}
+        <button onClick={withdraw}>RedeemPoints 2 ETH</button> {/* Change button text */}
+        <button onClick={saveTransactionHistoryAsPDF}>Save Transaction History</button>
+        <button onClick={deleteTransactions}>Delete All Transactions</button>
         <h2>Transaction History</h2>
         <ul>{renderTransactions()}</ul>
       </div>
-    )
-  }
+    );
+  };
 
-  useEffect(() => {getWallet();}, []);
+  useEffect(() => {
+    getWallet();
+  }, []);
 
   return (
     <main className="container">
-      <header><h1>Welcome to the WeBanks!</h1></header>
+      <header>
+        <h1>Welcome to the WeLoyalty!</h1>
+      </header>
       {initUser()}
-      <style jsx>{`	
+      <style jsx>{`
         .container {
-          background-color: #EDC3C6;
+          background-color: #edc3c6;
           text-align: center;
           margin: 50px auto;
           padding: 20px;
@@ -140,8 +160,7 @@ export default function HomePage() {
           box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
           font-family: Arial, sans-serif;
         }
-      `}
-      </style>
+      `}</style>
     </main>
-  )
+  );
 }
